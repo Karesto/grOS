@@ -1,0 +1,101 @@
+v 0.2.1 19/05/2019
+- ajout du shell simple dans shell.h
+- ajout d'une interface fichiers
+- ajout de header guards là où il manquaient
+- linked_list deplacées de kernel/shell dans libc/linked_list
+- chasse au warning (sauf dans mem.c...)
+- reorganisation du makefile, par defaut GrOS.bin (et plus GrOS.iso)
+- remplacement de make bootup par make run
+- touches finales dans fileio
+
+v 0.2.0 15/05/2019
+- reorganisation plus logique des fichiers
+- ajout d'une fonction readline
+
+
+v 0.1.3 13/05/19
+- ajout de malloc simpliste
+- debut de driver disque dur
+- gestion du curseur dans printer
+- keypressed deplacer dans printer
+- appel a init_gdt et tss deplacé dans boot.s
+
+
+v 0.1.2 09/05/19
+- ajout du mode qwerty
+- meilleur support du pavé numérique
+- ajout de Ctrl+Alt G <=> Alt Gr
+- ajout des appels système
+- ajout d'une execution de tache simpliste
+
+
+v 0.1.1 07/05/19
+- pilote du clavier azerty ajoute
+- dossier utilities cotient du code python qui a été utiliser pour générer les
+  table précompilés du pilote
+
+
+v 0.1.0 06/05/19
+- debugage des interruption (mauvais depilage apres interuption causer la GPF)
+- clavier et timer visible, reste a ecrire des drivers propre (et passer en azerty)
+
+
+v 0.0.7 21/04/19
+- correction de la GDT à l'aide du tuto français
+- deplace l'appel à isr_install directement dans boot.s et non dans kernel.c
+- correction de l'assembleur boot.s et interrupts.s:
+  - ajout des suffixe de taille (mov[b/w/l/q]) adaptes
+  - rajout de $ devant les constantes
+- les interruptions semblent marcher, une "General Protection Fault" est levée en 
+  permanence...
+- ajout d'un option de debug dans le makefile
+
+
+v 0.0.6 11/04/19
+- reorganisation de la structure des fichiers de code en 
+  plusieurs sous dossiers
+- interruptions clavier et timer non-fonctionnelles :(...
+- premiere version du pager
+
+v 0.0.5 28/03/19
+- renommage de printf en kprintf (impression kernel)
+- Création de interrupts.h/.c et interrupt.s
+   - les fichiers C code la gestion des interruption (affiche un message d'erreur), 
+     la création de l'IDT et son chargement avec lidt (via asm)
+   - l'assembleur défini les fonction d'interruptions proprement dites,
+     (une par entrée) puis met en forme les arguments pour appeler une fonction C
+
+
+v 0.0.4 21/03/19
+- suppression de GDT.c (deplacé dans deprecated)
+  la GDT est initialisé directement dans boot.s
+- simplification des commentaires de boot.s
+- ajout de fonctionnalités à printf:
+   - impression en hexadécimal, octal et binaire
+   - impression sur 64 bits avec %ld
+   - impression non signée avec %ud
+   - impression avec padding ('00000' avec %05d ou '     ' avec %5d)
+   - impression de n-fois un caractères ou une chaine avec %5c %5s
+
+
+v 0.0.3 20/03/19
+- ajout de terminal_clearline dans printer et d'un code ANSI correspondant
+- creation de GDT.c
+  -> créer un GDT simpliste
+  -> la charge avec LGDT
+
+
+v 0.0.2 14/03/19
+- creation de printer.c
+  -> implementation de fonction utile a l'affichage terminal
+  -> definition de codes pseudo-ANSI pour les couleurs
+     et le mouvement du curseur sur le terminal
+     implementés dans printer.c - terminal_putchar
+  -> première version de printf (sans stdout, affichage terminal direct)
+     accepte le formatage %d, %c, %s et %b
+
+
+v 0.0.1 7/03/19
+- "hello kernel world !"
+- bare bones tutoriel de OSDev.org
+- boot.s génère la pile pour pouvoir exécuter le kernel (codé en C)

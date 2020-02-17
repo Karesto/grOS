@@ -1,0 +1,78 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[french]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+\usepackage{url}
+\usepackage{hyperref}
+
+\usepackage[top=2cm, bottom=2cm, right=2cm, left=2cm]{geometry}
+
+\title{Rapport projet d'OS}
+\date{}
+\author{Dorian Lesbre, Ahmed Choukarah, Julien Lamiroy}
+\begin{document}
+\maketitle
+
+\section{Introduction}
+
+Le projet cherche à réaliser certaines fonctions de bases d'un système d'exploitation sur x86. Le système est émulé avec QEMU et GRUB, qui fournit un bootloader (sur le standard multiboot).
+
+\paragraph{Compilation et exécution:} le projet est compilé à l'aide de programme non standard: pour compiler nous utilisons un compilateur croisé \texttt{gcc} tournant sous linux et générant du code 
+\texttt{i686-elf}.
+Nous l'avons installé en suivant les instructions de la page \url{https://wiki.osdev.org/GCC_Cross-Compiler}. Il vous faudra remplacer le chemin du compilateur CPATH dans le makefile pour pourvoir compiler.
+
+
+De plus pour exécuter le programme et générer l'iso les packages \texttt{qemu}, \texttt{grub-common2}, \texttt{grub-efi-amd64}, \texttt{mtools} et \texttt{xorisso} sont requis.
+
+
+Dans le répertoire du projet, \texttt{make run} permet de l'exécuter avec qemu
+
+\section{Détails du projet}
+
+\paragraph{Séquence de boot:} le programme commence dans \texttt{boot/boot.s}. Ce fichier créer un pile (pour pouvoir exécuter le code C) puis appelle les différentes fonctions d'initialisation du noyau, avant d'appel \texttt{kernel\_main}.
+
+\paragraph{Terminal:} le terminal est géré par le fichier \texttt{drivers/tty}. Nous utilisons le terminal VGA fournit par le bootloader. Il permet un affichage des caractère ASCII avec 16 couleurs sur une fenêtre $80 \times 25$, en écrivant à l'adresse \texttt{0xB8000}. Notre pilote garde en mémoire un position ligne et colonne pour faciliter l'utilisation, et fournit des méthodes simples pour déplacer le curseur, changer la couleur, aller à la ligne (en faisant défiler l'écran si besoin).
+
+
+L'usage principal du terminal peut se faire avec la fonction \texttt{terminal\_putchar} qui affiche un caractère et déplace le curseur d'une case. Elle prend également en charge de code pseudo-ANSI à l'aide d'un parseur simpliste. Ces codes permettent de gérer tout le terminal uniquement à l'aide d'impression. Il y a notamment \texttt{\textbackslash n}, \texttt{\textbackslash t} mais aussi des plus complexe comme \texttt{\textbackslash 033[4f]} pour changer la couleur de police en 4 (rouge). La documentation de ces codes se trouve dans \texttt{drivers/tty.h}
+
+\paragraph{Interruptions:} elles sont gérés par les fichiers \texttt{cpu/interrupts.c .h} et \texttt{cpu/interrupt.s}. Le code assembleur défini une fonction par porte de l'idt supportée (de 0 à 31 pour les interruptions processeur, de 32 à 48 pour celles du PIC), qui sauvegarde l'état avant d'appeler le code C. De base ce dernier se contente d'afficher le numéro de l'interruption sur l'écran. 
+
+
+Nous avons toutefois codés des gestion plus poussées des interruption timer, clavier et appels systèmes. Le timer (\texttt{drivers/timer}) se contente d'incrémenter une variable \texttt{tick} à fréquence fixe.
+
+\paragraph{Clavier:} implémenter dans \texttt{drivers/keyboard} il converti le scancode du clavier en une valeur 32 bits contenant l'information ligne/colonne de la touche sur le clavier, l'ensemble des modificateurs activé (\texttt{Maj}, \texttt{Ctrl}...) ainsi q'un représentation ASCII sur les 8-bits faible si possible, où un code unique sinon. Cette valeur est spécifiée dans \texttt{drivers/keyboard.h}. Cette valeur est ensuite passé à \texttt{key\_pressed} (fonction de \texttt{libc/iostream.c}). Note que certaines touches ne sont pas prises en charge car inexistante sur nos claviers ou non-visible pour QEMU (la touche windows par exemple...)
+
+
+\paragraph{Entrée/sortie:} le module \texttt{libc/iostream} contient des fonctions encapsulant celle du terminal \texttt{drivers/tty} et du clavier \texttt{drivers/keyboard}. 
+
+
+Pour l'affichage, \texttt{kprintf} se comporte presque comme \texttt{printf}, elle support l'affichage de nombre (décimal \texttt{\%d}, binaire \texttt{\%b}, octal \texttt{\%o} ou hexadécimal \texttt{\%x}) ainsi que des caractères (\texttt{\%c}) et des chaines (\texttt{\%s}). Elle permet également de spécifié si un nombre est signé ou non, d'inclure un padding à base d'espace ou de zéros à l'aide de code plus complexes (définis dans \texttt{iostream.h}).
+
+
+Pour la lecture, une fonction \texttt{readline} permet de lire une ligne en attendant que l'utilisateur appuie sur entrée, en prennant en charge le décalage (flèches gauche et droite) du curseur, les insertions et suppression... Si aucune ligne est lue, les touches pressées s'affichent à l'écran (pour tester/débugger)
+
+
+\paragraph{Système de fichier:} il est réparti en trois fichiers:
+\begin{itemize}
+\item coté machine \texttt{drivers/disk} fournit des fonction pour écrire/lire un secteur de disque spécifié par un adresse LBA 24 bits. Nous avons tenté d'utiliser le format ATA mais le driver n'est pas fonctionnel (la lecture/écriture marche en général lors du premier appel mais pas le suivants...)
+\item \texttt{kernel/filesystem} est un intermédiaire qui permet d'écrire les fichiers sous forme de liste doublement chainées. Un fichier une suite de bloc de 512 octet. Chaque bloc possède une entête de 5 octet, suivi du contenu. L'entête donne des information sur le bloc (libre/occupées, ainsi que les adresse des blocs suivant et précédents) Le blocs libre sont également chainés et accessibles depuis le bloc 0. La spécification précise est dans \texttt{kernel/filesystem.h}
+\item \texttt{libc/fileio} fournit l'interface utilisateur, avec les fonction de shell standard, un type \texttt{directory\_t} et \texttt{file\_t} donnant les informations d'un fichier et dossier. Elle permet de passer d'un chemin (chaine de caractères) à l'adresse disque et gère les dossier. Ces-derniers sont simplement des fichiers contenant une liste d'adresse des autres fichiers. Leur spécification est dans \texttt{libc/fileio.h}
+\end{itemize}
+\paragraph{Paging:} 
+    Le paging est implémenté dans \texttt{./cpu/pager}, où la fonction \texttt{init\_mm()} permet d'initialiser ce paging. Le paging est pour l'instant linéaire, sauf dans le cas des taches utilisateurs où on a un offset de \texttt{0x40000000}.
+    Le paging est fonctionnel, ce qu'on peut vérifier avec la commande \texttt{info tlb} ou encore \texttt{info mem} dans le prompt Qemu.
+    
+\paragraph{Les appels systèmes:} 
+    Implémentés dans \texttt{./kernel/syscall}. L'argument du syscall doit être push sur la pile (fait dans le fichier \texttt{interrupts.s}). Pour l'instant, puisque le système de processus n'est pas encore suffisament avancé, nous n'avons qu'un seul syscall, qui est utilisé pour imprimer du texte sur l'écran, dont l'adresse est passée dans le registre \texttt{\%ebx}.
+
+
+\paragraph{L'execution de taches:}
+    Partie non fonctionelle.
+    Elle se trouve dans le dossier \texttt{./core}, l'idée étant de recourir à l'instruction \texttt{iret} pour executer du code dans la mémoire.
+    Malheuresement, cette instruction est assez compliquée à utiliser et nous n'arrivons toujours pas a débuger les problèmes qui s'en suivent (Des page fault, et des general protection fault).
+
+
+
+\end{document}
